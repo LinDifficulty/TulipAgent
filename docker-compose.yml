@@ -12,6 +12,13 @@ services:
       - ./data:/app/data
     networks:
       - tulipagent
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 
   frontend:
     build:
@@ -21,18 +28,26 @@ services:
     restart: unless-stopped
     networks:
       - tulipagent
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   nginx:
     image: nginx:alpine
-    container_name: tulipagent-nginx
+    container_name: nginx
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     networks:
       - tulipagent
 

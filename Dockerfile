@@ -8,10 +8,16 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 Python 依赖（使用清华 pip 镜像）
+# 先复制依赖文件，利用层缓存
 COPY pyproject.toml .
-COPY backend/ backend/
+# 如果有 uv.lock 则复制（可选）
+# COPY uv.lock .
+
+# 安装 Python 依赖（使用清华 pip 镜像）
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple .
+
+# 再复制应用代码（依赖未变化时可复用缓存层）
+COPY backend/ backend/
 
 # 创建数据目录
 RUN mkdir -p data/sqlite data/chroma data/files
