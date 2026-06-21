@@ -1,0 +1,31 @@
+# ---- 构建阶段 ----
+FROM node:20-slim AS builder
+
+# 使用 npmmirror 镜像源（服务器无法连接外网）
+RUN npm config set registry https://registry.npmmirror.com
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# ---- 运行阶段 ----
+FROM node:20-slim AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# 从构建阶段复制 Next.js standalone 产物
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]

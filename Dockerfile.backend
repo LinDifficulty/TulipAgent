@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+# 使用阿里云镜像源（服务器无法连接外网）
+RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
+    pip config set install.trusted-host mirrors.aliyun.com
+
+WORKDIR /app
+
+# 先复制依赖文件，利用 Docker 缓存层
+COPY pyproject.toml ./
+COPY backend/ ./backend/
+COPY main.py ./
+
+# 安装依赖（不使用 uv，直接 pip）
+RUN pip install --no-cache-dir .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
