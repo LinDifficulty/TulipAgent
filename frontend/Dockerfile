@@ -8,8 +8,9 @@ RUN npm ci
 
 COPY . .
 
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# 默认使用空字符串，nginx 反向代理模式下前端和 API 同源
+# 如需直连后端，设置为后端地址，如 http://your-server:8000
+ENV NEXT_PUBLIC_API_URL=""
 
 RUN npm run build
 
