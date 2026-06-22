@@ -6,6 +6,11 @@ RUN npm config set registry https://registry.npmmirror.com
 
 WORKDIR /app
 
+# 接收构建参数（docker-compose.yml 通过 build.args 传入）
+# NEXT_PUBLIC_API_URL 为空 → 前端用相对路径请求 /api/ → 同源 → 浏览器不触发 CORS
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
