@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # ============================================================
+  # 后端 - FastAPI (Python 3.12)
+  # ============================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: tulipagent-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DEBUG=false
+    volumes:
+      # 持久化数据：SQLite / ChromaDB / 上传文件
+      - tulipagent_data:/app/data
+    networks:
+      - tulipagent-network
+
+  # ============================================================
+  # 前端 - Next.js 16 (Node.js 20)
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+      args:
+        # 留空 → 前端使用相对路径 /api/ → 经外部 Nginx → 同源无 CORS
+        NEXT_PUBLIC_API_URL: ""
+    container_name: tulipagent-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - tulipagent-network
+
+# ============================================================
+# 持久化数据卷
+# ============================================================
+volumes:
+  tulipagent_data:
+    driver: local
+
+# ============================================================
+# 内部网络
+# ============================================================
+networks:
+  tulipagent-network:
+    driver: bridge
