@@ -57,9 +57,12 @@ def create_app() -> FastAPI:
     )
 
     # CORS 配置
+    # 注意: allow_credentials=True 时 allow_origins 不能为 ["*"]，
+    # 必须指定明确的来源列表（浏览器 CORS 规范限制）
+    cors_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 开发环境允许所有来源
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

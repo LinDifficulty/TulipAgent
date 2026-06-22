@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
 
+    # CORS 配置（多个来源用逗号分隔）
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/sqlite/tulipagent.db"
     CHROMA_PERSIST_DIR: str = "./data/chroma"
