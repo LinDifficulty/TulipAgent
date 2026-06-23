@@ -264,6 +264,30 @@ export function WeeklyCalendar() {
     }
   }, [needsScroll, startHour, endHour]);
 
+  // 滚轮联动：日历网格滚动到顶部/底部时，自动转为整体页面滚动
+  useEffect(() => {
+    const grid = scrollRef.current;
+    if (!grid || !needsScroll) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = grid;
+      const atTop = scrollTop <= 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+      // 在顶部向上滚 或 在底部向下滚 → 让事件冒泡到父级滚动容器
+      if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
+        return; // 不阻止默认行为，事件自然冒泡
+      }
+
+      // 网格内部可滚动 → 阻止冒泡，在网格内处理滚动
+      e.preventDefault();
+      grid.scrollTop += e.deltaY;
+    };
+
+    grid.addEventListener("wheel", handleWheel, { passive: false });
+    return () => grid.removeEventListener("wheel", handleWheel);
+  }, [needsScroll]);
+
   // 每天的冲突统计
   const dailyConflicts = useMemo(() => {
     return weekDays.map((day) => detectConflicts(events, day).size);
@@ -378,7 +402,11 @@ export function WeeklyCalendar() {
           {/* 时间网格 */}
           <div
             ref={scrollRef}
-            className={cn("flex-1", needsScroll && "overflow-y-auto scroll-container")}
+            className={cn(
+              "flex-1",
+              needsScroll && "overflow-y-auto"
+            )}
+            style={needsScroll ? { overscrollBehavior: "auto" } : undefined}
           >
             <div className="flex" style={{ height: needsScroll ? `${totalPx}px` : "100%" }}>
               {/* 时间刻度列 */}

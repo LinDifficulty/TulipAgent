@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { emitDataChange, useDataChangeListener } from "@/lib/data-events";
 import { PackageDialog } from "./package-dialog";
 import { PackageEditDialog } from "./package-edit-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PackageDetail } from "./package-detail";
 import { getStatusConfig, StatusBadge } from "./package-status";
 
@@ -20,6 +21,7 @@ export function PackageList() {
   const [editPkg, setEditPkg] = useState<PackageData | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [refreshingId, setRefreshingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const loadPackages = useCallback(async () => {
     try {
@@ -41,7 +43,13 @@ export function PackageList() {
   useDataChangeListener("packages", loadPackages);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确定删除这个快递吗？")) return;
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmDeleteId;
+    if (id === null) return;
+    setConfirmDeleteId(null);
     try {
       await deletePackage(id);
       setPackages((prev) => prev.filter((p) => p.id !== id));
@@ -236,6 +244,15 @@ export function PackageList() {
         packageId={detailId}
         onClose={() => setDetailId(null)}
         onUpdate={handleDetailUpdate}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title="删除快递"
+        message="确定删除这个快递吗？"
       />
     </>
   );

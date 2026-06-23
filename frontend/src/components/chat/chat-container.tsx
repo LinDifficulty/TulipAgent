@@ -1,16 +1,23 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage, Message } from "./chat-message";
 import { ChatInput } from "./chat-input";
-import { sendMessage, getWelcomeMessage } from "@/lib/api";
+import { sendMessage, getWelcomeMessage, getConversation } from "@/lib/api";
 import { v4 as uuidv4 } from "uuid";
 
-export function ChatContainer() {
+const STORAGE_KEY = "tulip_last_session_id";
+
+interface ChatContainerProps {
+  sessionId: string | null;
+  onSessionChange: (sessionId: string) => void;
+}
+
+export function ChatContainer({ sessionId, onSessionChange }: ChatContainerProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const loadedSessionRef = useRef<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,31 +27,71 @@ export function ChatContainer() {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    const loadWelcome = async () => {
-      try {
-        const welcomeMsg = await getWelcomeMessage();
-        setMessages([
-          {
-            id: "welcome",
+  // 加载会话消息
+  const loadSession = useCallback(async (sid: string) => {
+    setIsLoading(true);
+    try {
+      const data = await getConversation(sid);
+      if (data.messages.length > 0) {
+        const msgs: Message[] = [];
+        data.messages.forEach((row) => {
+          msgs.push({
+            id: `user-${row.id}`,
+            role: "user",
+            content: row.message,
+            timestamp: new Date(row.created_at),
+          });
+          msgs.push({
+            id: `assistant-${row.id}`,
             role: "assistant",
-            content: welcomeMsg,
-            timestamp: new Date(),
-          },
-        ]);
-      } catch {
-        setMessages([
-          {
-            id: "welcome",
-            role: "assistant",
-            content: "你好呀~ 我是 TulipAgent 🌷 有什么需要帮忙的吗？",
-            timestamp: new Date(),
-          },
-        ]);
+            content: row.response,
+            timestamp: new Date(row.created_at),
+          });
+        });
+        setMessages(msgs);
+      } else {
+        await loadWelcome();
       }
-    };
-    loadWelcome();
+    } catch {
+      await loadWelcome();
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  const loadWelcome = async () => {
+    try {
+      const welcomeMsg = await getWelcomeMessage();
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content: welcomeMsg,
+          timestamp: new Date(),
+        },
+      ]);
+    } catch {
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content: "你好呀~ 我是 TulipAgent 🌷 有什么需要帮忙的吗？",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  };
+
+  // 初始加载
+  useEffect(() => {
+    if (sessionId && sessionId !== loadedSessionRef.current) {
+      loadedSessionRef.current = sessionId;
+      loadSession(sessionId);
+    } else if (!sessionId) {
+      loadedSessionRef.current = null;
+      loadWelcome();
+    }
+  }, [sessionId, loadSession]);
 
   const handleSend = async (content: string) => {
     const userMessage: Message = {
@@ -63,7 +110,10 @@ export function ChatContainer() {
       });
 
       if (!sessionId) {
-        setSessionId(response.session_id);
+        onSessionChange(response.session_id);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEY, response.session_id);
+        }
       }
 
       const assistantMessage: Message = {
@@ -103,7 +153,6 @@ export function ChatContainer() {
         {/* Typing indicator */}
         {isLoading && (
           <div className="flex gap-3 py-3 animate-fade-in">
-            {/* Bot avatar placeholder */}
             <div className="flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
               <svg
                 className="h-4 w-4 md:h-[18px] md:w-[18px] animate-pulse"
@@ -116,7 +165,6 @@ export function ChatContainer() {
                 <circle cx="12" cy="12" r="10" />
               </svg>
             </div>
-            {/* Typing dots in a bubble */}
             <div className="bg-card border border-border/80 rounded-2xl rounded-tl-md px-5 py-3.5 shadow-sm">
               <div className="flex items-center gap-1.5">
                 {[0, 1, 2].map((i) => (
@@ -136,7 +184,6 @@ export function ChatContainer() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 输入框 */}
       <ChatInput onSend={handleSend} disabled={isLoading} />
     </div>
   );

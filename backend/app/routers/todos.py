@@ -94,7 +94,9 @@ async def list_todos(
     # 始终过滤已删除的待办
     query = query.where(Todo.deleted == False)
 
-    if not completed:
+    if completed:
+        query = query.where(Todo.completed == True)
+    else:
         query = query.where(Todo.completed == False)
     priority_order = case(
         (Todo.priority == "high", 1),
@@ -130,7 +132,10 @@ async def update_todo(
     if todo_data.description is not None:
         todo.description = todo_data.description
     if todo_data.due_date is not None:
-        todo.due_date = datetime.strptime(todo_data.due_date, "%Y-%m-%d").date()
+        if todo_data.due_date.strip() == "":
+            todo.due_date = None
+        else:
+            todo.due_date = datetime.strptime(todo_data.due_date, "%Y-%m-%d").date()
     if todo_data.priority is not None:
         todo.priority = todo_data.priority
     if todo_data.completed is not None:

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { ChatContainer } from "@/components/chat/chat-container";
+import { ChatHistoryDialog } from "@/components/chat/chat-history-dialog";
 import { EventList } from "@/components/events/event-list";
 import { WeeklyCalendar } from "@/components/events/weekly-calendar";
 import { TodoList } from "@/components/todos/todo-list";
@@ -11,10 +12,12 @@ import { PackageList } from "@/components/packages/package-list";
 import { AnniversaryList } from "@/components/anniversaries/anniversary-list";
 import { WorkHub } from "@/components/work/work-hub";
 import { WorkLogList } from "@/components/work-logs/work-log-list";
-import { MessageSquare, Briefcase, ArrowLeft, Shield, LogOut, Loader2, Phone } from "lucide-react";
+import { MessageSquare, Briefcase, ArrowLeft, Shield, LogOut, Loader2, Phone, History } from "lucide-react";
 import { PhoneDialog } from "@/components/profile/phone-dialog";
 
 type WorkView = null | "events" | "todos" | "packages" | "anniversaries" | "worklogs";
+
+const STORAGE_KEY = "tulip_last_session_id";
 
 const NAV_ITEMS = [
   { key: "chat", label: "聊天", icon: MessageSquare },
@@ -79,6 +82,39 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"chat" | "work">("chat");
   const [workView, setWorkView] = useState<WorkView>(null);
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+
+  // 会话管理：从 localStorage 恢复上次会话 ID
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(STORAGE_KEY);
+    }
+    return null;
+  });
+  const [chatKey, setChatKey] = useState(0); // 用于强制重新挂载 ChatContainer
+
+  const handleSessionChange = (newSessionId: string) => {
+    setSessionId(newSessionId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, newSessionId);
+    }
+  };
+
+  const handleSelectSession = (sid: string) => {
+    setSessionId(sid);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, sid);
+    }
+    setChatKey((k) => k + 1); // 强制 ChatContainer 重新挂载以加载新会话
+  };
+
+  const handleNewConversation = () => {
+    setSessionId(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    setChatKey((k) => k + 1);
+  };
 
   // 未登录跳转
   useEffect(() => {
@@ -143,6 +179,13 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-1">
               <button
+                onClick={() => setHistoryDialogOpen(true)}
+                className="p-1.5 rounded-lg transition-all text-muted-foreground hover:text-primary hover:bg-primary/10"
+                title="聊天记录"
+              >
+                <History className="h-4 w-4" />
+              </button>
+              <button
                 onClick={() => setPhoneDialogOpen(true)}
                 className={`p-1.5 rounded-lg transition-all ${
                   account?.phone
@@ -195,7 +238,13 @@ export default function Home() {
         {/* 桌面端 */}
         <div className="hidden md:flex flex-1 overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0">
-            {activeTab === "chat" && <ChatContainer />}
+            {activeTab === "chat" && (
+              <ChatContainer
+                key={chatKey}
+                sessionId={sessionId}
+                onSessionChange={handleSessionChange}
+              />
+            )}
             {activeTab === "work" && workView === null && (
               <WorkHub onSelect={setWorkView} />
             )}
@@ -223,6 +272,13 @@ export default function Home() {
               </span>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setHistoryDialogOpen(true)}
+                className="p-1.5 rounded-lg transition-all text-muted-foreground hover:text-primary"
+                title="聊天记录"
+              >
+                <History className="h-4 w-4" />
+              </button>
               <button
                 onClick={() => setPhoneDialogOpen(true)}
                 className={`p-1.5 rounded-lg transition-all ${
@@ -254,7 +310,13 @@ export default function Home() {
           </div>
 
           <div className="flex-1 min-h-0 overflow-hidden">
-            {activeTab === "chat" && <ChatContainer />}
+            {activeTab === "chat" && (
+              <ChatContainer
+                key={chatKey}
+                sessionId={sessionId}
+                onSessionChange={handleSessionChange}
+              />
+            )}
             {activeTab === "work" && workView === null && (
               <WorkHub onSelect={setWorkView} />
             )}
@@ -298,6 +360,15 @@ export default function Home() {
           </nav>
         </div>
       </main>
+
+      {/* 聊天记录对话框 */}
+      <ChatHistoryDialog
+        open={historyDialogOpen}
+        onClose={() => setHistoryDialogOpen(false)}
+        onSelectSession={handleSelectSession}
+        onNewConversation={handleNewConversation}
+        activeSessionId={sessionId}
+      />
 
       {/* 手机号编辑对话框 */}
       <PhoneDialog

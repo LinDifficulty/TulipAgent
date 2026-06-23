@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { AccountDialog } from "@/components/admin/account-dialog";
 import { GroupDialog } from "@/components/admin/group-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   ArrowLeft,
   Shield,
@@ -114,6 +115,7 @@ function AccountsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [confirmDeleteAccountId, setConfirmDeleteAccountId] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -135,7 +137,13 @@ function AccountsTab() {
   }, [loadData]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确定删除此账号？")) return;
+    setConfirmDeleteAccountId(id);
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    const id = confirmDeleteAccountId;
+    if (id === null) return;
+    setConfirmDeleteAccountId(null);
     try {
       await adminDeleteAccount(id);
       loadData();
@@ -287,6 +295,15 @@ function AccountsTab() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteAccountId !== null}
+        onClose={() => setConfirmDeleteAccountId(null)}
+        onConfirm={handleConfirmDeleteAccount}
+        variant="danger"
+        title="删除账号"
+        message="确定删除此账号？"
+      />
     </div>
   );
 }
@@ -299,6 +316,7 @@ function GroupsTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<AdminGroup | null>(null);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<number | null>(null);
 
   // 成员查看状态
   const [expandedGroupId, setExpandedGroupId] = useState<number | null>(null);
@@ -360,7 +378,13 @@ function GroupsTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确定删除此用户组？组内成员将变为独立用户。")) return;
+    setConfirmDeleteGroupId(id);
+  };
+
+  const handleConfirmDeleteGroup = async () => {
+    const id = confirmDeleteGroupId;
+    if (id === null) return;
+    setConfirmDeleteGroupId(null);
     try {
       await adminDeleteGroup(id);
       if (expandedGroupId === id) setExpandedGroupId(null);
@@ -555,6 +579,15 @@ function GroupsTab() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteGroupId !== null}
+        onClose={() => setConfirmDeleteGroupId(null)}
+        onConfirm={handleConfirmDeleteGroup}
+        variant="danger"
+        title="删除用户组"
+        message="确定删除此用户组？组内成员将变为独立用户。"
+      />
     </div>
   );
 }

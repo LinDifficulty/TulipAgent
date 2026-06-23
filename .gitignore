@@ -29,6 +29,7 @@ Thumbs.db
 frontend/.next/
 frontend/node_modules/
 frontend/out/
+node_modules
 
 # pytest
 .pytest_cache/
@@ -44,3 +45,4 @@ htmlcov/
 # Claude Code tool config
 .claude/
 .agents/
+

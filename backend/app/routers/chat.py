@@ -3,12 +3,15 @@ import time
 import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
+from sqlalchemy import select, func, desc
 
 from ..agent.graph import get_agent_graph
 from ..agent.prompts import WELCOME_MESSAGE
 from ..agent.context import current_account_id, current_group_id, current_is_admin
 from ..models.account import Account
+from ..models.conversation import Conversation
+from ..database import async_session_factory
 from ..auth import get_current_account
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -148,6 +151,18 @@ async def send_message(
     # 更新会话历史
     sessions.update(session_id, result["messages"])
 
+    # 持久化到数据库
+    async with async_session_factory() as db:
+        conv = Conversation(
+            user_id=str(account.id),
+            message=request.message,
+            response=response_text,
+            tool_calls=tool_calls if tool_calls else None,
+            session_id=session_id,
+        )
+        db.add(conv)
+        await db.commit()
+
     return ChatResponse(
         response=response_text,
         session_id=session_id,
@@ -177,6 +192,99 @@ async def delete_session(
     """删除会话"""
     sessions.delete(session_id)
     return {"status": "ok"}
+
+
+@router.get("/conversations")
+async def list_conversations(
+    account: Account = Depends(get_current_account),
+):
+    """获取用户的会话历史列表"""
+    async with async_session_factory() as db:
+        result = await db.execute(
+            select(Conversation)
+            .where(Conversation.user_id == str(account.id))
+            .order_by(Conversation.created_at.desc())
+        )
+        all_convs = result.scalars().all()
+
+    # 按 session_id 分组，取每个会话的预览信息
+    sessions_map: dict[str, dict] = {}
+    for conv in all_convs:
+        if conv.session_id not in sessions_map:
+            sessions_map[conv.session_id] = {
+                "session_id": conv.session_id,
+                "last_active": conv.created_at,
+                "message_count": 0,
+                "preview": conv.message,
+                "started_at": conv.created_at,
+            }
+        sessions_map[conv.session_id]["message_count"] += 1
+        # 由于按 created_at desc 排序，最后遍历到的是最早的消息
+        sessions_map[conv.session_id]["preview"] = conv.message
+        sessions_map[conv.session_id]["started_at"] = conv.created_at
+
+    conversations = sorted(
+        sessions_map.values(),
+        key=lambda x: x["last_active"],
+        reverse=True,
+    )
+
+    return {
+        "conversations": [
+            {
+                "session_id": c["session_id"],
+                "started_at": c["started_at"].isoformat(),
+                "last_active": c["last_active"].isoformat(),
+                "message_count": c["message_count"],
+                "preview": c["preview"][:80] if c["preview"] else "",
+            }
+            for c in conversations
+        ]
+    }
+
+
+@router.get("/conversations/{session_id}")
+async def get_conversation(
+    session_id: str,
+    account: Account = Depends(get_current_account),
+):
+    """获取指定会话的所有消息"""
+    async with async_session_factory() as db:
+        result = await db.execute(
+            select(Conversation)
+            .where(
+                Conversation.user_id == str(account.id),
+                Conversation.session_id == session_id,
+            )
+            .order_by(Conversation.created_at)
+        )
+        rows = result.scalars().all()
+
+    if not rows:
+        return {"session_id": session_id, "messages": []}
+
+    # 重建内存中的会话（如果已过期），便于继续对话
+    if sessions.get(session_id) is None:
+        history = []
+        for row in rows:
+            history.append(HumanMessage(content=row.message))
+            history.append(AIMessage(content=row.response))
+        sessions.create(session_id)
+        sessions.update(session_id, history)
+
+    return {
+        "session_id": session_id,
+        "messages": [
+            {
+                "id": row.id,
+                "message": row.message,
+                "response": row.response,
+                "tool_calls": row.tool_calls,
+                "created_at": row.created_at.isoformat(),
+            }
+            for row in rows
+        ],
+    }
 
 
 # WebSocket 连接管理

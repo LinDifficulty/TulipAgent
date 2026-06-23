@@ -8,12 +8,14 @@ import { getEvents, deleteEvent, EventData } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import { emitDataChange, useDataChangeListener } from "@/lib/data-events";
 import { EventDialog } from "./event-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function EventList() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -35,7 +37,13 @@ export function EventList() {
   useDataChangeListener("events", loadEvents);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确定删除这个事件吗？")) return;
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmDeleteId;
+    if (id === null) return;
+    setConfirmDeleteId(null);
     try {
       await deleteEvent(id);
       setEvents((prev) => prev.filter((e) => e.id !== id));
@@ -164,6 +172,15 @@ export function EventList() {
         onClose={() => setEditingEvent(null)}
         onUpdated={handleUpdated}
         editEvent={editingEvent}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title="删除日程"
+        message="确定删除这个事件吗？"
       />
     </>
   );

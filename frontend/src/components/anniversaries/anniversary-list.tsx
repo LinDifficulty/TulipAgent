@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { emitDataChange, useDataChangeListener } from "@/lib/data-events";
 import { AnniversaryDialog } from "./anniversary-dialog";
 import { AnniversaryEditDialog } from "./anniversary-edit-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function daysUntilAnniversary(dateStr: string): { days: number; label: string } {
   const today = new Date();
@@ -32,6 +33,7 @@ export function AnniversaryList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingAnniversary, setEditingAnniversary] = useState<AnniversaryData | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const loadAnniversaries = useCallback(async () => {
     try {
@@ -53,7 +55,13 @@ export function AnniversaryList() {
   useDataChangeListener("anniversaries", loadAnniversaries);
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确定删除这个纪念日吗？")) return;
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmDeleteId;
+    if (id === null) return;
+    setConfirmDeleteId(null);
     try {
       await deleteAnniversary(id);
       setAnniversaries((prev) => prev.filter((a) => a.id !== id));
@@ -201,6 +209,15 @@ export function AnniversaryList() {
         onClose={() => setEditDialogOpen(false)}
         onUpdated={handleUpdated}
         anniversary={editingAnniversary}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title="删除纪念日"
+        message="确定删除这个纪念日吗？"
       />
     </>
   );

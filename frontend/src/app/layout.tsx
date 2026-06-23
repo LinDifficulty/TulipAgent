@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_SC } from "next/font/google";
 import { AuthProvider } from "@/contexts/auth-context";
+import "highlight.js/styles/github.css";
 import "./globals.css";
 
 const notoSansSC = Noto_Sans_SC({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useMemo, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-time-picker";
@@ -21,21 +21,12 @@ const PRIORITIES = [
   { value: "high", label: "高", color: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/30" },
 ];
 
-/** 生成日期输入框兼容的字符串 (YYYY-MM-DD) */
-function toDateInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 export function TodoDialog({ open, onClose, onCreated, onUpdated, editTodo }: TodoDialogProps) {
   const isEdit = !!editTodo;
-  const defaultDate = useMemo(() => toDateInput(new Date()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [open]);
 
   const titleRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLInputElement>(null);
-  const [dueDate, setDueDate] = useState(defaultDate);
+  const [dueDate, setDueDate] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [priority, setPriority] = useState("medium");
   const [scope, setScope] = useState("shared");
@@ -48,16 +39,16 @@ export function TodoDialog({ open, onClose, onCreated, onUpdated, editTodo }: To
     if (open) {
       if (editTodo) {
         setPriority(editTodo.priority || "medium");
-        setDueDate(editTodo.due_date || defaultDate);
+        setDueDate(editTodo.due_date || "");
         setScope(editTodo.scope || "shared");
       } else {
         setPriority("medium");
-        setDueDate(defaultDate);
+        setDueDate("");
         setScope("shared");
       }
       setError("");
     }
-  }, [open, defaultDate, editTodo]);
+  }, [open, editTodo]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // 单独处理 ref 赋值（因为 ref 不在 deps 中）
@@ -99,7 +90,7 @@ export function TodoDialog({ open, onClose, onCreated, onUpdated, editTodo }: To
         const updated = await updateTodo(editTodo.id, {
           title,
           description: description || undefined,
-          due_date: dueDate || undefined,
+          due_date: dueDate || "",
           priority: priority as "low" | "medium" | "high",
           scope,
         });
@@ -108,7 +99,7 @@ export function TodoDialog({ open, onClose, onCreated, onUpdated, editTodo }: To
         const todo: TodoData = {
           title,
           description: description || undefined,
-          due_date: dueDate || undefined,
+          due_date: dueDate || "",
           priority: priority as "low" | "medium" | "high",
           scope,
         };
@@ -180,16 +171,28 @@ export function TodoDialog({ open, onClose, onCreated, onUpdated, editTodo }: To
             <label className="block text-sm font-medium text-foreground mb-1.5">
               截止日期
             </label>
-            <button
-              type="button"
-              onClick={() => setDatePickerOpen(true)}
-              className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm text-left transition-all duration-150 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring/50"
-            >
-              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className={dueDate ? "text-foreground" : "text-muted-foreground/50"}>
-                {dueDate || "点击选择"}
-              </span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDatePickerOpen(true)}
+                className="flex h-10 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm text-left transition-all duration-150 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring/50"
+              >
+                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className={dueDate ? "text-foreground" : "text-muted-foreground/50"}>
+                  {dueDate || "无需截止日期"}
+                </span>
+              </button>
+              {dueDate && (
+                <button
+                  type="button"
+                  onClick={() => setDueDate("")}
+                  className="h-10 w-10 shrink-0 rounded-lg border border-input bg-background flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-all duration-150"
+                  aria-label="清除截止日期"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           <div>

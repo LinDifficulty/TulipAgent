@@ -87,6 +87,42 @@ export async function getWelcomeMessage(): Promise<string> {
   return data.message;
 }
 
+export interface ConversationSummary {
+  session_id: string;
+  started_at: string;
+  last_active: string;
+  message_count: number;
+  preview: string;
+}
+
+export interface ConversationMessage {
+  id: number;
+  message: string;
+  response: string;
+  tool_calls: Array<{ name: string; args: Record<string, unknown> }> | null;
+  created_at: string;
+}
+
+export interface ConversationData {
+  session_id: string;
+  messages: ConversationMessage[];
+}
+
+export async function getConversations(): Promise<ConversationSummary[]> {
+  const response = await authFetch(`${API_BASE}/api/chat/conversations`, {
+    headers: authHeaders(),
+  });
+  const data = await response.json();
+  return data.conversations;
+}
+
+export async function getConversation(sessionId: string): Promise<ConversationData> {
+  const response = await authFetch(`${API_BASE}/api/chat/conversations/${sessionId}`, {
+    headers: authHeaders(),
+  });
+  return response.json();
+}
+
 // 日程 API
 export async function createEvent(event: EventData): Promise<EventData> {
   const response = await authFetch(`${API_BASE}/api/events/`, {

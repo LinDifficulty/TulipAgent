@@ -26,6 +26,7 @@ import {
 } from "@/lib/api";
 import { emitDataChange, useDataChangeListener } from "@/lib/data-events";
 import { WorkLogDialog } from "./work-log-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { WeekPicker, MonthPicker } from "@/components/ui/date-time-picker";
 
 export function WorkLogList() {
@@ -47,6 +48,8 @@ export function WorkLogList() {
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<number | null>(null);
+  const [confirmDeleteContent, setConfirmDeleteContent] = useState<{ logId: number; index: number } | null>(null);
 
   const loadLogs = useCallback(async () => {
     try {
@@ -164,12 +167,17 @@ export function WorkLogList() {
 
   // 删除单条内容
   const handleDeleteContent = async (logId: number, index: number) => {
-    if (!confirm("确定删除这条工作内容吗？")) return;
+    setConfirmDeleteContent({ logId, index });
+  };
+
+  const handleConfirmDeleteContent = async () => {
+    const params = confirmDeleteContent;
+    if (params === null) return;
+    setConfirmDeleteContent(null);
     try {
-      const result = await deleteWorkLogContent(logId, index);
-      // 如果返回的日志已没有内容，从列表中移除
+      const result = await deleteWorkLogContent(params.logId, params.index);
       if (!result.contents || result.contents.length === 0) {
-        setLogs((prev) => prev.filter((l) => l.id !== logId));
+        setLogs((prev) => prev.filter((l) => l.id !== params.logId));
       } else {
         setLogs((prev) => prev.map((l) => (l.id === result.id ? result : l)));
       }
@@ -181,10 +189,16 @@ export function WorkLogList() {
 
   // 删除整条日志
   const handleDeleteLog = async (logId: number) => {
-    if (!confirm("确定删除这天的所有工作日志吗？")) return;
+    setConfirmDeleteLogId(logId);
+  };
+
+  const handleConfirmDeleteLog = async () => {
+    const id = confirmDeleteLogId;
+    if (id === null) return;
+    setConfirmDeleteLogId(null);
     try {
-      await deleteWorkLog(logId);
-      setLogs((prev) => prev.filter((l) => l.id !== logId));
+      await deleteWorkLog(id);
+      setLogs((prev) => prev.filter((l) => l.id !== id));
       emitDataChange("worklogs");
     } catch (error) {
       console.error("删除工作日志失败:", error);
@@ -461,6 +475,24 @@ export function WorkLogList() {
       onConfirm={handleMonthConfirm}
       defaultYear={year}
       defaultMonth={month}
+    />
+
+    <ConfirmDialog
+      open={confirmDeleteContent !== null}
+      onClose={() => setConfirmDeleteContent(null)}
+      onConfirm={handleConfirmDeleteContent}
+      variant="danger"
+      title="删除工作内容"
+      message="确定删除这条工作内容吗？"
+    />
+
+    <ConfirmDialog
+      open={confirmDeleteLogId !== null}
+      onClose={() => setConfirmDeleteLogId(null)}
+      onConfirm={handleConfirmDeleteLog}
+      variant="danger"
+      title="删除全部工作日志"
+      message="确定删除这天的所有工作日志吗？"
     />
     </>
   );

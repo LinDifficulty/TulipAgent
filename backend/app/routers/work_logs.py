@@ -125,7 +125,7 @@ async def add_work_log_content(
             content=json.dumps(contents, ensure_ascii=False),
             log_date=log_date,
             created_by=str(account.id),
-            group_id=account.group_id,
+            group_id=None,
         )
         db.add(work_log)
 
@@ -145,11 +145,8 @@ async def list_work_logs(
     """获取工作日志列表"""
     query = select(WorkLog)
 
-    # 按用户组过滤
-    if account.group_id is not None:
-        query = query.where(WorkLog.group_id == account.group_id)
-    else:
-        query = query.where(WorkLog.created_by == str(account.id))
+    # 个人独占：始终按创建者过滤
+    query = query.where(WorkLog.created_by == str(account.id))
 
     # 日期过滤
     if start_date:
@@ -177,14 +174,9 @@ async def get_weekly_summary(
     week_start = today - timedelta(days=weekday) + timedelta(weeks=week_offset)
     week_end = week_start + timedelta(days=6)
 
-    query = select(WorkLog)
-    if account.group_id is not None:
-        query = query.where(WorkLog.group_id == account.group_id)
-    else:
-        query = query.where(WorkLog.created_by == str(account.id))
-
-    query = query.where(
-        and_(WorkLog.log_date >= week_start, WorkLog.log_date <= week_end)
+    query = select(WorkLog).where(
+        WorkLog.created_by == str(account.id),
+        and_(WorkLog.log_date >= week_start, WorkLog.log_date <= week_end),
     ).order_by(WorkLog.log_date)
 
     result = await db.execute(query)
@@ -216,14 +208,9 @@ async def get_monthly_summary(
     else:
         month_end = date(target_year, target_month + 1, 1) - timedelta(days=1)
 
-    query = select(WorkLog)
-    if account.group_id is not None:
-        query = query.where(WorkLog.group_id == account.group_id)
-    else:
-        query = query.where(WorkLog.created_by == str(account.id))
-
-    query = query.where(
-        and_(WorkLog.log_date >= month_start, WorkLog.log_date <= month_end)
+    query = select(WorkLog).where(
+        WorkLog.created_by == str(account.id),
+        and_(WorkLog.log_date >= month_start, WorkLog.log_date <= month_end),
     ).order_by(WorkLog.log_date)
 
     result = await db.execute(query)
@@ -250,10 +237,8 @@ async def get_work_log(
     if not work_log:
         raise HTTPException(status_code=404, detail="工作日志不存在")
 
-    # 权限检查
-    if account.group_id and work_log.group_id != account.group_id:
-        raise HTTPException(status_code=403, detail="无权查看此工作日志")
-    if not account.group_id and work_log.created_by != str(account.id):
+    # 权限检查：个人独占
+    if work_log.created_by != str(account.id):
         raise HTTPException(status_code=403, detail="无权查看此工作日志")
 
     return WorkLogResponse.from_orm_model(work_log)
@@ -272,10 +257,8 @@ async def update_work_log_content(
     if not work_log:
         raise HTTPException(status_code=404, detail="工作日志不存在")
 
-    # 权限检查
-    if account.group_id and work_log.group_id != account.group_id:
-        raise HTTPException(status_code=403, detail="无权修改此工作日志")
-    if not account.group_id and work_log.created_by != str(account.id):
+    # 权限检查：个人独占
+    if work_log.created_by != str(account.id):
         raise HTTPException(status_code=403, detail="无权修改此工作日志")
 
     try:
@@ -307,10 +290,8 @@ async def delete_work_log_content(
     if not work_log:
         raise HTTPException(status_code=404, detail="工作日志不存在")
 
-    # 权限检查
-    if account.group_id and work_log.group_id != account.group_id:
-        raise HTTPException(status_code=403, detail="无权修改此工作日志")
-    if not account.group_id and work_log.created_by != str(account.id):
+    # 权限检查：个人独占
+    if work_log.created_by != str(account.id):
         raise HTTPException(status_code=403, detail="无权修改此工作日志")
 
     try:
@@ -349,10 +330,8 @@ async def update_work_log(
     if not work_log:
         raise HTTPException(status_code=404, detail="工作日志不存在")
 
-    # 权限检查
-    if account.group_id and work_log.group_id != account.group_id:
-        raise HTTPException(status_code=403, detail="无权修改此工作日志")
-    if not account.group_id and work_log.created_by != str(account.id):
+    # 权限检查：个人独占
+    if work_log.created_by != str(account.id):
         raise HTTPException(status_code=403, detail="无权修改此工作日志")
 
     if log_data.summary is not None:
@@ -377,10 +356,8 @@ async def delete_work_log(
     if not work_log:
         raise HTTPException(status_code=404, detail="工作日志不存在")
 
-    # 权限检查
-    if account.group_id and work_log.group_id != account.group_id:
-        raise HTTPException(status_code=403, detail="无权删除此工作日志")
-    if not account.group_id and work_log.created_by != str(account.id):
+    # 权限检查：个人独占
+    if work_log.created_by != str(account.id):
         raise HTTPException(status_code=403, detail="无权删除此工作日志")
 
     await db.delete(work_log)

@@ -9,6 +9,7 @@ import { getTodos, completeTodo, deleteTodo, restoreTodo, TodoData } from "@/lib
 import { useAuth } from "@/contexts/auth-context";
 import { emitDataChange, useDataChangeListener } from "@/lib/data-events";
 import { TodoDialog } from "./todo-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function TodoList() {
   const { account, isAdmin } = useAuth();
@@ -21,6 +22,8 @@ export function TodoList() {
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [completingIds, setCompletingIds] = useState<Set<number>>(new Set());
   const [detailTodo, setDetailTodo] = useState<TodoData | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [confirmDeleteArchivedId, setConfirmDeleteArchivedId] = useState<number | null>(null);
 
   const loadTodos = useCallback(async () => {
     try {
@@ -82,7 +85,13 @@ export function TodoList() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("确定删除这个待办吗？")) return;
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmDeleteId;
+    if (id === null) return;
+    setConfirmDeleteId(null);
     try {
       await deleteTodo(id);
       setTodos((prev) => prev.filter((t) => t.id !== id));
@@ -104,7 +113,13 @@ export function TodoList() {
   };
 
   const handleDeleteArchived = async (id: number) => {
-    if (!confirm("确定删除这个已归档的待办吗？")) return;
+    setConfirmDeleteArchivedId(id);
+  };
+
+  const handleConfirmDeleteArchived = async () => {
+    const id = confirmDeleteArchivedId;
+    if (id === null) return;
+    setConfirmDeleteArchivedId(null);
     try {
       await deleteTodo(id);
       setArchivedTodos((prev) => prev.filter((t) => t.id !== id));
@@ -386,6 +401,24 @@ export function TodoList() {
       />
 
       {/* 描述详情对话框 */}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title="删除待办"
+        message="确定删除这个待办吗？"
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteArchivedId !== null}
+        onClose={() => setConfirmDeleteArchivedId(null)}
+        onConfirm={handleConfirmDeleteArchived}
+        variant="danger"
+        title="删除已归档待办"
+        message="确定删除这个已归档的待办吗？"
+      />
+
       {detailTodo && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div

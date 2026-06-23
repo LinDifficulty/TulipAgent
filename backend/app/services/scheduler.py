@@ -1,6 +1,6 @@
 """定时任务调度器 - 自动刷新快递状态"""
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger

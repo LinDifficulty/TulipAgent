@@ -92,7 +92,8 @@ async def list_events(
         query = query.where(Event.start_time >= start)
 
     if end_date:
-        end = datetime.strptime(end_date, "%Y-%m-%d")
+        # 将结束日期设为当天 23:59:59，确保包含该日全天的事件
+        end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
         query = query.where(Event.start_time <= end)
 
     query = query.order_by(Event.start_time)

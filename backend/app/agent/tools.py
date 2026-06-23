@@ -1,6 +1,6 @@
 ﻿"""Agent 工具定义"""
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 from langchain_core.tools import tool
 from sqlalchemy import select, func, or_, case
@@ -77,9 +77,11 @@ async def list_events(
             start = datetime.now().replace(hour=0, minute=0, second=0)
 
         if end_date:
-            end = datetime.strptime(end_date, "%Y-%m-%d")
+            # 将结束日期设为当天 23:59:59，确保包含该日全天的事件
+            end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
         else:
-            end = start + timedelta(days=7)
+            # 默认查询 7 天内，包含第 7 天全天
+            end = (start + timedelta(days=7)).replace(hour=23, minute=59, second=59)
 
         query = query.where(Event.start_time >= start, Event.start_time <= end)
 
@@ -234,7 +236,9 @@ async def list_todos(
         # 始终过滤已删除的待办
         query = query.where(Todo.deleted == False)
 
-        if not completed:
+        if completed:
+            query = query.where(Todo.completed == True)
+        else:
             query = query.where(Todo.completed == False)
 
         priority_order = case(
@@ -731,7 +735,6 @@ async def add_work_log(
         log_date: 日志日期，格式：YYYY-MM-DD（可选，默认今天）
     """
     account_id = current_account_id.get()
-    group_id = current_group_id.get()
     target_date = datetime.strptime(log_date, "%Y-%m-%d").date() if log_date else date.today()
     now = datetime.now(timezone.utc)
 
@@ -767,7 +770,7 @@ async def add_work_log(
                 content=json.dumps(contents, ensure_ascii=False),
                 log_date=target_date,
                 created_by=account_id or "system",
-                group_id=group_id,
+                group_id=None,
             )
             session.add(work_log)
 
@@ -789,16 +792,12 @@ async def list_work_logs(
         limit: 返回条数，默认20
     """
     account_id = current_account_id.get()
-    group_id = current_group_id.get()
 
     async with async_session_factory() as session:
         query = select(WorkLog)
 
-        # 按用户组过滤
-        if group_id is not None:
-            query = query.where(WorkLog.group_id == group_id)
-        elif account_id:
-            query = query.where(WorkLog.created_by == account_id)
+        # 个人独占：始终按创建者过滤
+        query = query.where(WorkLog.created_by == (account_id or "system"))
 
         # 日期过滤
         if start_date:
@@ -842,7 +841,6 @@ async def summarize_work_logs(period: str = "week") -> str:
         period: 总结周期 - "week"（本周）或 "month"（本月）
     """
     account_id = current_account_id.get()
-    group_id = current_group_id.get()
 
     async with async_session_factory() as session:
         today = date.today()
@@ -862,13 +860,8 @@ async def summarize_work_logs(period: str = "week") -> str:
                 end = date(today.year, today.month + 1, 1) - timedelta(days=1)
             period_name = "本月"
 
-        query = select(WorkLog)
-        if group_id is not None:
-            query = query.where(WorkLog.group_id == group_id)
-        elif account_id:
-            query = query.where(WorkLog.created_by == account_id)
-
-        query = query.where(
+        query = select(WorkLog).where(
+            WorkLog.created_by == (account_id or "system"),
             WorkLog.log_date >= start,
             WorkLog.log_date <= end,
         ).order_by(WorkLog.log_date)

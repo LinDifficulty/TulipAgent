@@ -1,4 +1,5 @@
 """LangGraph Agent 工作流"""
+import logging
 from typing import Annotated, Sequence, TypedDict
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
@@ -10,6 +11,8 @@ from ..models.memory import Memory
 from .tools import get_all_tools
 from .prompts import get_system_prompt
 from .llm_factory import get_llm
+
+logger = logging.getLogger(__name__)
 
 
 # Agent 状态
@@ -89,6 +92,13 @@ def create_agent_graph():
 
         # 调用 LLM
         response = await llm_with_tools.ainvoke(messages)
+        # 诊断日志：记录 LLM 是否返回了工具调用
+        has_tool_calls = bool(getattr(response, "tool_calls", None))
+        if has_tool_calls:
+            tool_names = [tc["name"] for tc in response.tool_calls]
+            logger.info(f"[Agent] LLM 请求调用工具: {tool_names}, args: {[tc.get('args', {}) for tc in response.tool_calls]}")
+        else:
+            logger.info(f"[Agent] LLM 直接回复（未调用任何工具），回复前50字: {str(response.content)[:50]}")
         return {"messages": [response]}
 
     def should_continue(state: AgentState) -> str:
@@ -97,9 +107,12 @@ def create_agent_graph():
         last_message = messages[-1]
 
         # 如果有工具调用，继续
-        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        has_tool_calls = bool(getattr(last_message, "tool_calls", None))
+        if has_tool_calls:
+            logger.info(f"[Graph] should_continue → tools (调用 {[tc['name'] for tc in last_message.tool_calls]})")
             return "tools"
         # 否则结束
+        logger.info(f"[Graph] should_continue → END（无工具调用，对话结束）")
         return END
 
     # 构建图
