@@ -18,7 +18,8 @@ services:
       - DEBUG=false
     volumes:
       # 持久化数据：SQLite / ChromaDB / 上传文件
-      - tulipagent_data:/app/data
+      # bind mount → 数据库文件直接映射到宿主机 ./data 目录，方便备份/同步
+      - ./data:/app/data
     networks:
       - tulipagent-network
 
@@ -45,13 +46,6 @@ services:
         condition: service_healthy
     networks:
       - tulipagent-network
-
-# ============================================================
-# 持久化数据卷
-# ============================================================
-volumes:
-  tulipagent_data:
-    driver: local
 
 # ============================================================
 # 内部网络

@@ -16,8 +16,8 @@ async def ensure_default_admin():
     from sqlalchemy import select
     async with async_session_factory() as session:
         # 检查是否已有 admin 账号
-        result = await session.execute(select(Account).where(Account.role == "admin"))
-        if result.scalar_one_or_none() is not None:
+        result = await session.execute(select(Account).where(Account.role == "admin").limit(1))
+        if result.scalar() is not None:
             return
 
         # 创建默认管理员
