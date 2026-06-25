@@ -31,6 +31,7 @@ export function PackageDetail({ packageId, onClose, onUpdate }: PackageDetailPro
     }
   }, [packageId]);
 
+  // 打开详情时从数据库拉取最新数据（纯 DB 读，不调快递100 API）
   useEffect(() => {
     if (packageId) {
       loadDetail();

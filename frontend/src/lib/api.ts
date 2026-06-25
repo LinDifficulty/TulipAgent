@@ -181,6 +181,10 @@ export async function createTodo(todo: TodoData): Promise<TodoData> {
     headers: authHeaders(),
     body: JSON.stringify(todo),
   });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "创建待办失败");
+  }
   return response.json();
 }
 
@@ -193,6 +197,10 @@ export async function updateTodo(
     headers: authHeaders(),
     body: JSON.stringify(todo),
   });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "更新待办失败");
+  }
   return response.json();
 }
 
@@ -214,6 +222,10 @@ export async function completeTodo(id: number): Promise<TodoData> {
     method: "POST",
     headers: authHeaders(),
   });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "完成待办失败");
+  }
   return response.json();
 }
 
@@ -222,6 +234,10 @@ export async function restoreTodo(id: number): Promise<TodoData> {
     method: "POST",
     headers: authHeaders(),
   });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "恢复待办失败");
+  }
   return response.json();
 }
 
@@ -339,6 +355,10 @@ export async function createAnniversary(data: AnniversaryData): Promise<Annivers
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "创建纪念日失败");
+  }
   return response.json();
 }
 
@@ -518,8 +538,10 @@ export async function deleteWorkLog(id: number): Promise<void> {
 }
 // 个人资料 API
 export async function updateMyProfile(data: {
-  phone: string | null;
-}): Promise<{ id: number; nickname: string; phone: string | null; role: string; group_id: number | null }> {
+  nickname?: string;
+  phone?: string | null;
+  token?: string;
+}): Promise<{ id: number; token: string; nickname: string; phone: string | null; role: string; group_id: number | null }> {
   const response = await authFetch(`${API_BASE}/api/auth/me`, {
     method: "PUT",
     headers: authHeaders(),

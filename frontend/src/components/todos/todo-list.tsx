@@ -67,19 +67,26 @@ export function TodoList() {
   const handleComplete = async (id: number) => {
     if (completingIds.has(id)) return;
     setCompletingIds((prev) => new Set(prev).add(id));
-    // 动画播放完毕后再调用 API 移除
+    // 动画播放完毕后先移除该项，再调用 API
     setTimeout(async () => {
-      try {
-        await completeTodo(id);
-      } catch (error) {
-        console.error("完成失败:", error);
-      }
       setTodos((prev) => prev.filter((t) => t.id !== id));
       setCompletingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
+      // 如果归档列表已展开，刷新归档列表
+      setShowArchived((prev) => {
+        if (prev) {
+          loadArchivedTodos();
+        }
+        return prev;
+      });
+      try {
+        await completeTodo(id);
+      } catch (error) {
+        console.error("完成失败:", error);
+      }
       emitDataChange("todos");
     }, 850);
   };
@@ -354,27 +361,29 @@ export function TodoList() {
                           )}
                         </div>
                       </div>
+                      {/* 恢复按钮：创建者、管理员、或同组共享成员可见 */}
+                      {(todo.created_by === String(account?.id) || isAdmin || todo.scope === "shared") && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-7 w-7 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 hover:bg-primary/10 hover:text-primary"
+                          onClick={() => todo.id && handleRestore(todo.id)}
+                          aria-label="恢复待办"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {/* 删除按钮：仅创建者或管理员可见 */}
                       {(todo.created_by === String(account?.id) || isAdmin) && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 h-7 w-7 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 hover:bg-primary/10 hover:text-primary"
-                            onClick={() => todo.id && handleRestore(todo.id)}
-                            aria-label="恢复待办"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 h-7 w-7 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => todo.id && handleDeleteArchived(todo.id)}
-                            aria-label="删除归档待办"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-7 w-7 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => todo.id && handleDeleteArchived(todo.id)}
+                          aria-label="删除归档待办"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       )}
                     </div>
                   ))

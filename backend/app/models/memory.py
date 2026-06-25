@@ -22,7 +22,7 @@ class Memory(Base):
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # 归属
-    account_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    account_id: Mapped[int] = mapped_column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
     group_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("user_groups.id"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

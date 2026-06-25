@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # OpenAI 兼容 API 配置 (适用于 OpenAI / DeepSeek / 其他兼容 API)
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
-    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_MODEL: str = "gpt-4o-mini"    # 仅在 LLM_PROVIDER="openai" 时生效；DeepSeek/Ollama 使用各自的 MODEL 配置
 
     # DeepSeek API 配置
     DEEPSEEK_API_KEY: str = ""

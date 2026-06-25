@@ -229,7 +229,7 @@ async def query_tracking(carrier_code: str, tracking_number: str, phone: str | N
                 last_update = f"{latest.get('time', '')} {latest.get('context', '')}"
                 # 根据最新物流内容判断状态
                 ctx = latest.get("context", "")
-                if "签收" in ctx or "已取" in ctx or "代收" in ctx:
+                if "签收" in ctx or "已取" in ctx or "代收" in ctx or "收件" in ctx:
                     status = "已签收"
                 elif "派送" in ctx or "派件" in ctx or "正在派送" in ctx:
                     status = "派送中"

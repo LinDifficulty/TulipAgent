@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Plus,
   Trash2,
@@ -12,12 +11,9 @@ import {
   ChevronRight,
   BookOpen,
   Pencil,
-  Check,
-  X,
 } from "lucide-react";
 import {
   getWorkLogs,
-  updateWorkLogContent,
   deleteWorkLogContent,
   deleteWorkLog,
   getWeeklySummary,
@@ -37,17 +33,14 @@ export function WorkLogList() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
 
-  // 添加对话框
+  // 添加/编辑对话框
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editData, setEditData] = useState<{ logId: number; index: number; content: string } | null>(null);
 
   // 日期选择器
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
-  // 编辑状态
-  const [editingLogId, setEditingLogId] = useState<number | null>(null);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editContent, setEditContent] = useState("");
   const [confirmDeleteLogId, setConfirmDeleteLogId] = useState<number | null>(null);
   const [confirmDeleteContent, setConfirmDeleteContent] = useState<{ logId: number; index: number } | null>(null);
 
@@ -138,31 +131,16 @@ export function WorkLogList() {
     setMonth(m);
   };
 
-  // 开始编辑
+  // 打开编辑对话框
   const handleStartEdit = (logId: number, index: number, content: string) => {
-    setEditingLogId(logId);
-    setEditingIndex(index);
-    setEditContent(content);
+    setEditData({ logId, index, content });
+    setDialogOpen(true);
   };
 
-  // 取消编辑
-  const handleCancelEdit = () => {
-    setEditingLogId(null);
-    setEditingIndex(null);
-    setEditContent("");
-  };
-
-  // 保存编辑
-  const handleSaveEdit = async () => {
-    if (editingLogId === null || editingIndex === null || !editContent.trim()) return;
-    try {
-      const result = await updateWorkLogContent(editingLogId, editingIndex, editContent.trim());
-      setLogs((prev) => prev.map((l) => (l.id === result.id ? result : l)));
-      handleCancelEdit();
-      emitDataChange("worklogs");
-    } catch (error) {
-      console.error("更新工作内容失败:", error);
-    }
+  // 编辑保存回调
+  const handleUpdated = (log: WorkLogData) => {
+    setLogs((prev) => prev.map((l) => (l.id === log.id ? log : l)));
+    emitDataChange("worklogs");
   };
 
   // 删除单条内容
@@ -256,7 +234,7 @@ export function WorkLogList() {
       <CardContent>
         <Button
           size="sm"
-          onClick={() => setDialogOpen(true)}
+          onClick={() => { setEditData(null); setDialogOpen(true); }}
           className="h-9 w-full rounded-lg text-xs font-medium mb-4 gap-1"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -393,62 +371,27 @@ export function WorkLogList() {
                       key={item.index}
                       className="group flex items-start gap-2 px-3.5 py-2.5 hover:bg-muted/20 transition-colors"
                     >
-                      {editingLogId === log.id && editingIndex === item.index ? (
-                        /* 编辑模式 */
-                        <div className="flex-1 flex items-center gap-2">
-                          <Input
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSaveEdit();
-                              if (e.key === "Escape") handleCancelEdit();
-                            }}
-                            className="flex-1 h-8 text-sm"
-                            autoFocus
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0 hover:bg-primary/10 hover:text-primary"
-                            onClick={handleSaveEdit}
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0 hover:bg-muted"
-                            onClick={handleCancelEdit}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ) : (
-                        /* 显示模式 */
-                        <>
-                          <p className="flex-1 text-[13px] text-foreground leading-relaxed">
-                            {item.content}
-                          </p>
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
-                              onClick={() => handleStartEdit(log.id, item.index, item.content)}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => handleDeleteContent(log.id, item.index)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </>
-                      )}
+                      <p className="flex-1 text-[13px] text-foreground leading-relaxed">
+                        {item.content}
+                      </p>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
+                          onClick={() => handleStartEdit(log.id, item.index, item.content)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => handleDeleteContent(log.id, item.index)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -461,8 +404,10 @@ export function WorkLogList() {
 
     <WorkLogDialog
       open={dialogOpen}
-      onClose={() => setDialogOpen(false)}
+      onClose={() => { setDialogOpen(false); setEditData(null); }}
       onAdded={handleAdded}
+      onUpdated={handleUpdated}
+      editData={editData}
     />
     <WeekPicker
       open={weekPickerOpen}

@@ -34,7 +34,7 @@ class MemoryResponse(BaseModel):
     content: str
     category: str
     keywords: Optional[str]
-    account_id: str
+    account_id: int
     created_at: datetime
     last_used_at: Optional[datetime]
 
@@ -53,7 +53,7 @@ async def create_memory(
         content=data.content,
         category=data.category,
         keywords=data.keywords,
-        account_id=str(account.id),
+        account_id=account.id,
         group_id=account.group_id,
     )
     db.add(memory)
@@ -76,10 +76,10 @@ async def list_memories(
     if account.group_id is not None:
         query = query.where(or_(
             Memory.group_id == account.group_id,
-            Memory.account_id == str(account.id),
+            Memory.account_id == account.id,
         ))
     else:
-        query = query.where(Memory.account_id == str(account.id))
+        query = query.where(Memory.account_id == account.id)
 
     if category:
         query = query.where(Memory.category == category)
@@ -105,7 +105,7 @@ async def update_memory(
         raise HTTPException(status_code=404, detail="记忆不存在")
 
     # 权限检查
-    if memory.account_id != str(account.id):
+    if memory.account_id != account.id:
         raise HTTPException(status_code=403, detail="无权修改此记忆")
 
     if data.content is not None:
@@ -131,7 +131,7 @@ async def delete_memory(
     if not memory:
         raise HTTPException(status_code=404, detail="记忆不存在")
 
-    if memory.account_id != str(account.id):
+    if memory.account_id != account.id:
         raise HTTPException(status_code=403, detail="无权删除此记忆")
 
     await db.delete(memory)

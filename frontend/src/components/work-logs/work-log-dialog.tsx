@@ -3,31 +3,40 @@
 import { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
-import { X, BookOpen } from "lucide-react";
-import { addWorkLogContent, WorkLogData } from "@/lib/api";
+import { X, BookOpen, Pencil } from "lucide-react";
+import { addWorkLogContent, updateWorkLogContent, WorkLogData } from "@/lib/api";
 
 interface WorkLogDialogProps {
   open: boolean;
   onClose: () => void;
   onAdded?: (log: WorkLogData) => void;
+  onUpdated?: (log: WorkLogData) => void;
+  /** 如果提供 editData，对话框为编辑模式 */
+  editData?: {
+    logId: number;
+    index: number;
+    content: string;
+  } | null;
 }
 
-export function WorkLogDialog({ open, onClose, onAdded }: WorkLogDialogProps) {
+export function WorkLogDialog({ open, onClose, onAdded, onUpdated, editData }: WorkLogDialogProps) {
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const isEditMode = !!editData;
 
   useEffect(() => {
     if (open) {
       setError("");
       requestAnimationFrame(() => {
         if (contentRef.current) {
-          contentRef.current.value = "";
+          contentRef.current.value = editData?.content ?? "";
           contentRef.current.focus();
         }
       });
     }
-  }, [open]);
+  }, [open, editData]);
 
   if (!open) return null;
 
@@ -46,11 +55,17 @@ export function WorkLogDialog({ open, onClose, onAdded }: WorkLogDialogProps) {
     try {
       setSubmitting(true);
       setError("");
-      const result = await addWorkLogContent({ content });
-      onAdded?.(result);
+
+      if (isEditMode && editData) {
+        const result = await updateWorkLogContent(editData.logId, editData.index, content);
+        onUpdated?.(result);
+      } else {
+        const result = await addWorkLogContent({ content });
+        onAdded?.(result);
+      }
       handleClose();
     } catch (err) {
-      setError("添加失败，请重试");
+      setError(isEditMode ? "保存失败，请重试" : "添加失败，请重试");
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -70,9 +85,15 @@ export function WorkLogDialog({ open, onClose, onAdded }: WorkLogDialogProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 dark:bg-primary/20">
-              <BookOpen className="h-4 w-4 text-primary" />
+              {isEditMode ? (
+                <Pencil className="h-4 w-4 text-primary" />
+              ) : (
+                <BookOpen className="h-4 w-4 text-primary" />
+              )}
             </div>
-            <h2 className="text-base font-semibold text-foreground">添加工作内容</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              {isEditMode ? "编辑工作内容" : "添加工作内容"}
+            </h2>
           </div>
           <button
             onClick={handleClose}
@@ -106,7 +127,7 @@ export function WorkLogDialog({ open, onClose, onAdded }: WorkLogDialogProps) {
               取消
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "添加中..." : "添加"}
+              {submitting ? (isEditMode ? "保存中..." : "添加中...") : (isEditMode ? "保存" : "添加")}
             </Button>
           </div>
         </form>

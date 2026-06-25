@@ -69,6 +69,34 @@ async def init_db():
             )
         except Exception:
             pass  # 列已存在则忽略
+        # 自动迁移：将 memories 表的 account_id 从 VARCHAR 改为 INTEGER（SQLite 通过重建表实现）
+        try:
+            # 检查列类型是否需要迁移
+            info_result = await conn.execute(text("PRAGMA table_info(memories)"))
+            columns = {row[1]: row[2] for row in info_result.fetchall()}
+            if columns.get("account_id", "").upper() not in ("INTEGER", "INT"):
+                # 重建表以修改列类型
+                await conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS memories_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        content TEXT NOT NULL,
+                        category VARCHAR(30) NOT NULL DEFAULT 'user_fact',
+                        keywords TEXT,
+                        account_id INTEGER NOT NULL REFERENCES accounts(id),
+                        group_id INTEGER REFERENCES user_groups(id),
+                        created_at DATETIME,
+                        last_used_at DATETIME
+                    )
+                """))
+                await conn.execute(text("""
+                    INSERT INTO memories_new (id, content, category, keywords, account_id, group_id, created_at, last_used_at)
+                    SELECT id, content, category, keywords, CAST(account_id AS INTEGER), group_id, created_at, last_used_at
+                    FROM memories
+                """))
+                await conn.execute(text("DROP TABLE memories"))
+                await conn.execute(text("ALTER TABLE memories_new RENAME TO memories"))
+        except Exception:
+            pass  # 迁移失败不影响启动
 
 
 async def close_db():

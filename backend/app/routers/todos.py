@@ -162,10 +162,15 @@ async def complete_todo(
     if not todo:
         raise HTTPException(status_code=404, detail="待办不存在")
 
-    # 权限检查：仅创建者或管理员可操作
+    # 权限检查：创建者、管理员，或同组成员可操作共享待办
     is_owner = todo.created_by == str(account.id)
     is_admin = account.role == "admin"
-    if not is_owner and not is_admin:
+    is_same_group = (
+        todo.scope == "shared"
+        and todo.group_id is not None
+        and account.group_id == todo.group_id
+    )
+    if not is_owner and not is_admin and not is_same_group:
         raise HTTPException(status_code=403, detail="无权操作此待办")
 
     todo.completed = True
@@ -186,10 +191,15 @@ async def restore_todo(
     if not todo:
         raise HTTPException(status_code=404, detail="待办不存在")
 
-    # 权限检查：仅创建者或管理员可操作
+    # 权限检查：创建者、管理员，或同组成员可操作共享待办
     is_owner = todo.created_by == str(account.id)
     is_admin = account.role == "admin"
-    if not is_owner and not is_admin:
+    is_same_group = (
+        todo.scope == "shared"
+        and todo.group_id is not None
+        and account.group_id == todo.group_id
+    )
+    if not is_owner and not is_admin and not is_same_group:
         raise HTTPException(status_code=403, detail="无权操作此待办")
 
     todo.completed = False

@@ -1,4 +1,5 @@
 """定时任务调度器 - 自动刷新快递状态"""
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -38,7 +39,7 @@ async def refresh_all_packages():
                 data = await refresh_package_status(pkg.carrier_code or "unknown", pkg.tracking_number, pkg.phone_last4)
                 pkg.status = data["status"]
                 pkg.last_update = data["last_update"]
-                pkg.tracking_info = __import__("json").dumps(data["tracking_info"], ensure_ascii=False)
+                pkg.tracking_info = json.dumps(data["tracking_info"], ensure_ascii=False)
                 pkg.updated_at = datetime.now(timezone.utc)
                 refreshed += 1
             except Exception as e:

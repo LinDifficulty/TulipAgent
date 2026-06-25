@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -94,7 +94,11 @@ async def list_events(
     if end_date:
         # 将结束日期设为当天 23:59:59，确保包含该日全天的事件
         end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-        query = query.where(Event.start_time <= end)
+        # 同时匹配：事件开始时间在范围内 或 事件有end_time且end_time在范围内（跨天事件）
+        query = query.where(or_(
+            Event.start_time <= end,
+            Event.end_time >= start if start_date else True,
+        ))
 
     query = query.order_by(Event.start_time)
     result = await db.execute(query)

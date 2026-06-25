@@ -53,14 +53,16 @@ def create_agent_graph():
         try:
             async with async_session_factory() as session:
                 from sqlalchemy import select, or_
+                # 将 state 中的字符串 account_id 转为 int
+                account_id_int = int(account_id) if account_id and account_id.isdigit() else None
                 stmt = select(Memory)
                 if group_id is not None:
                     stmt = stmt.where(or_(
                         Memory.group_id == group_id,
-                        Memory.account_id == account_id,
+                        Memory.account_id == account_id_int,
                     ))
-                elif account_id:
-                    stmt = stmt.where(Memory.account_id == account_id)
+                elif account_id_int is not None:
+                    stmt = stmt.where(Memory.account_id == account_id_int)
                 stmt = stmt.order_by(Memory.created_at.desc()).limit(20)
                 result = await session.execute(stmt)
                 memories = result.scalars().all()

@@ -83,7 +83,11 @@ async def list_events(
             # 默认查询 7 天内，包含第 7 天全天
             end = (start + timedelta(days=7)).replace(hour=23, minute=59, second=59)
 
-        query = query.where(Event.start_time >= start, Event.start_time <= end)
+        # 匹配：事件开始时间在范围内 或 跨天事件（end_time 在范围内）
+        query = query.where(or_(
+            Event.start_time.between(start, end),
+            Event.end_time.between(start, end),
+        ))
 
         query = query.order_by(Event.start_time)
         result = await session.execute(query)
@@ -135,8 +139,10 @@ async def update_event(
             event.title = title
         if start_time is not None:
             event.start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M")
-        if end_time is not None:
-            event.end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M") if end_time else None
+        if end_time and end_time.strip():
+            event.end_time = datetime.strptime(end_time.strip(), "%Y-%m-%d %H:%M")
+        elif end_time is not None:
+            event.end_time = None  # 明确清除 end_time
         if description is not None:
             event.description = description
         if remind_before is not None:
@@ -327,10 +333,16 @@ async def complete_todo(todo_id: int) -> str:
         if not todo:
             return f"❌ 未找到待办 ID: {todo_id}"
 
-        # 权限检查：仅创建者或管理员可操作
+        # 权限检查：创建者、管理员，或同组成员可操作共享待办
         is_owner = account_id and todo.created_by == account_id
         is_admin = current_is_admin.get()
-        if not is_owner and not is_admin:
+        is_same_group = (
+            todo.scope == "shared"
+            and todo.group_id is not None
+            and group_id is not None
+            and todo.group_id == group_id
+        )
+        if not is_owner and not is_admin and not is_same_group:
             return "❌ 无权操作此待办"
 
         todo.completed = True
@@ -347,16 +359,23 @@ async def restore_todo(todo_id: int) -> str:
         todo_id: 待办事项ID
     """
     account_id = current_account_id.get()
+    group_id = current_group_id.get()
 
     async with async_session_factory() as session:
         todo = await session.get(Todo, todo_id)
         if not todo:
             return f"❌ 未找到待办 ID: {todo_id}"
 
-        # 权限检查：仅创建者或管理员可操作
+        # 权限检查：创建者、管理员，或同组成员可操作共享待办
         is_owner = account_id and todo.created_by == account_id
         is_admin = current_is_admin.get()
-        if not is_owner and not is_admin:
+        is_same_group = (
+            todo.scope == "shared"
+            and todo.group_id is not None
+            and group_id is not None
+            and todo.group_id == group_id
+        )
+        if not is_owner and not is_admin and not is_same_group:
             return "❌ 无权操作此待办"
 
         todo.completed = False
@@ -532,6 +551,7 @@ async def update_package(
     package_id: int,
     tracking_number: Optional[str] = None,
     item_name: Optional[str] = None,
+    scope: Optional[str] = None,
 ) -> str:
     """修改快递记录信息。修改单号后会自动重新识别快递公司并刷新物流。
 
@@ -539,6 +559,7 @@ async def update_package(
         package_id: 快递ID
         tracking_number: 新的快递单号（可选）
         item_name: 新的物品名称（可选）
+        scope: 新的可见范围（personal: 仅自己可见, shared: 组内共享，可选）
     """
     account_id = current_account_id.get()
     group_id = current_group_id.get()
@@ -579,6 +600,9 @@ async def update_package(
 
         if item_name is not None:
             package.item_name = item_name
+        if scope is not None:
+            package.scope = scope
+            package.group_id = group_id if scope == "shared" else None
 
         package.updated_at = datetime.now(timezone.utc)
         await session.commit()
@@ -923,7 +947,7 @@ async def save_memory(
             content=content,
             category=category,
             keywords=keywords,
-            account_id=account_id or "system",
+            account_id=int(account_id) if account_id and account_id.isdigit() else 0,
             group_id=group_id,
         )
         session.add(memory)
@@ -938,19 +962,22 @@ async def recall_memory(query: str) -> str:
     Args:
         query: 搜索关键词
     """
-    account_id = current_account_id.get()
+    account_id_str = current_account_id.get()
     group_id = current_group_id.get()
 
     async with async_session_factory() as session:
         stmt = select(Memory)
 
+        # 将 context var 中的字符串 account_id 转为 int 用于 Memory 查询
+        account_id_int = int(account_id_str) if account_id_str and account_id_str.isdigit() else None
+
         if group_id is not None:
             stmt = stmt.where(or_(
                 Memory.group_id == group_id,
-                Memory.account_id == account_id,
+                Memory.account_id == account_id_int,
             ))
-        elif account_id:
-            stmt = stmt.where(Memory.account_id == account_id)
+        elif account_id_int is not None:
+            stmt = stmt.where(Memory.account_id == account_id_int)
 
         # 按内容和关键词搜索
         stmt = stmt.where(or_(
@@ -989,14 +1016,15 @@ async def delete_memory(memory_id: int) -> str:
     Args:
         memory_id: 记忆ID
     """
-    account_id = current_account_id.get()
+    account_id_str = current_account_id.get()
 
     async with async_session_factory() as session:
         memory = await session.get(Memory, memory_id)
         if not memory:
             return f"❌ 未找到记忆 ID: {memory_id}"
 
-        if memory.account_id != account_id:
+        account_id_int = int(account_id_str) if account_id_str and account_id_str.isdigit() else None
+        if memory.account_id != account_id_int:
             return "❌ 无权删除此记忆"
 
         content = memory.content

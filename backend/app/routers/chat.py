@@ -219,8 +219,8 @@ async def list_conversations(
                 "started_at": conv.created_at,
             }
         sessions_map[conv.session_id]["message_count"] += 1
-        # 由于按 created_at desc 排序，最后遍历到的是最早的消息
-        sessions_map[conv.session_id]["preview"] = conv.message
+        # 由于按 created_at desc 排序，第一条记录是最新消息（已设为 preview），
+        # 最后遍历到的是最早的消息，用于覆盖 started_at
         sessions_map[conv.session_id]["started_at"] = conv.created_at
 
     conversations = sorted(
@@ -310,12 +310,9 @@ manager = ConnectionManager()
 
 
 @router.websocket("/ws/{user_id}")
-async def websocket_chat(websocket: WebSocket, user_id: str):
-    """WebSocket 实时聊天"""
-    await manager.connect(websocket, user_id)
-    session_id = str(uuid.uuid4())
-
-    # 从数据库查询账户信息，获取 group_id
+async def websocket_chat(websocket: WebSocket, user_id: str, token: str = ""):
+    """WebSocket 实时聊天（需提供 token 认证）"""
+    # Token 认证：验证 Bearer token
     from ..database import async_session_factory
     from ..models.account import Account
     from sqlalchemy import select
@@ -323,11 +320,19 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
     ws_group_id = None
     ws_is_admin = False
     async with async_session_factory() as db:
-        result = await db.execute(select(Account).where(Account.id == int(user_id)))
+        result = await db.execute(select(Account).where(Account.token == token))
         account = result.scalar_one_or_none()
-        if account:
-            ws_group_id = account.group_id
-            ws_is_admin = account.role == "admin"
+        if not account or not account.is_active:
+            await websocket.close(code=4001, reason="无效的认证令牌")
+            return
+        if str(account.id) != user_id:
+            await websocket.close(code=4003, reason="令牌与用户不匹配")
+            return
+        ws_group_id = account.group_id
+        ws_is_admin = account.role == "admin"
+
+    await manager.connect(websocket, user_id)
+    session_id = str(uuid.uuid4())
 
     try:
         # 发送欢迎消息

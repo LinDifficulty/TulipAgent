@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { emitDataChange } from "@/lib/data-events";
 import { ChatContainer } from "@/components/chat/chat-container";
 import { ChatHistoryDialog } from "@/components/chat/chat-history-dialog";
 import { EventList } from "@/components/events/event-list";
@@ -12,8 +13,8 @@ import { PackageList } from "@/components/packages/package-list";
 import { AnniversaryList } from "@/components/anniversaries/anniversary-list";
 import { WorkHub } from "@/components/work/work-hub";
 import { WorkLogList } from "@/components/work-logs/work-log-list";
-import { MessageSquare, Briefcase, ArrowLeft, Shield, LogOut, Loader2, Phone, History } from "lucide-react";
-import { PhoneDialog } from "@/components/profile/phone-dialog";
+import { MessageSquare, Briefcase, ArrowLeft, Loader2, History } from "lucide-react";
+import { UserMenu } from "@/components/profile/user-menu";
 
 type WorkView = null | "events" | "todos" | "packages" | "anniversaries" | "worklogs";
 
@@ -77,11 +78,10 @@ function WorkContent({
 }
 
 export default function Home() {
-  const { isAuthenticated, isAdmin, isLoading, account, logout, refreshAccount } = useAuth();
+  const { isAuthenticated, isLoading, account } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"chat" | "work">("chat");
   const [workView, setWorkView] = useState<WorkView>(null);
-  const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
 
   // 会话管理：从 localStorage 恢复上次会话 ID
@@ -123,6 +123,13 @@ export default function Home() {
     }
   }, [isLoading, isAuthenticated, router]);
 
+  // 点击进入快递追踪时触发所有 PackageList 实例从数据库拉取最新数据
+  useEffect(() => {
+    if (workView === "packages") {
+      emitDataChange("packages");
+    }
+  }, [workView]);
+
   const handleTabChange = (tab: "chat" | "work") => {
     setActiveTab(tab);
     if (tab === "work") setWorkView(null);
@@ -144,92 +151,57 @@ export default function Home() {
 
   return (
     <div className="flex h-[100dvh] bg-background relative overflow-hidden">
-      {/* ===== 桌面端：左侧边栏 ===== */}
-      <aside className="hidden md:flex w-64 lg:w-72 xl:w-80 border-r border-border flex-col shrink-0 overflow-y-auto bg-muted/30">
-        {/* 侧边栏头部 — 品牌区域 + 用户信息 */}
-        <div className="sticky top-0 z-10 border-b border-border px-5 py-4 bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center justify-center gap-2.5">
-            <span className="text-2xl select-none" role="img" aria-label="tulip">
-              🌷
-            </span>
-            <h1 className="text-lg font-bold tracking-tight text-foreground text-render-optimized">
-              TulipAgent
-            </h1>
-          </div>
-          <p className="text-[11px] text-muted-foreground text-center mt-1 font-normal tracking-widest uppercase">
-            你们的专属助理
-          </p>
-
-          {/* 用户信息栏 */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-xs font-semibold text-primary">
-                  {account?.nickname?.[0] || "?"}
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {account?.nickname}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {account?.role === "admin" ? "管理员" : "用户"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setHistoryDialogOpen(true)}
-                className="p-1.5 rounded-lg transition-all text-muted-foreground hover:text-primary hover:bg-primary/10"
-                title="聊天记录"
-              >
-                <History className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setPhoneDialogOpen(true)}
-                className={`p-1.5 rounded-lg transition-all ${
-                  account?.phone
-                    ? "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                    : "text-muted-foreground/50 hover:text-primary hover:bg-primary/10"
-                }`}
-                title={account?.phone || "点击填写手机号"}
-              >
-                <Phone className="h-4 w-4" />
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => router.push("/admin")}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
-                  title="管理后台"
-                >
-                  <Shield className="h-4 w-4" />
-                </button>
-              )}
-              <button
-                onClick={logout}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                title="退出登录"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+      {/* ===== 桌面端：左侧导航栏 ===== */}
+      <aside className="hidden md:flex w-[72px] lg:w-20 border-r border-border flex-col shrink-0 bg-muted/30 select-none">
+        {/* 品牌图标 */}
+        <div className="flex items-center justify-center py-4 border-b border-border">
+          <span
+            className="text-2xl select-none cursor-pointer transition-transform duration-200 hover:scale-110 active:scale-95"
+            role="img"
+            aria-label="tulip"
+            onClick={() => handleTabChange("chat")}
+          >
+            🌷
+          </span>
         </div>
 
-        {/* 侧边栏内容 */}
-        <div className="flex-1 p-4 space-y-4 overflow-y-auto scroll-container">
-          <div className="animate-fade-in-up stagger-1">
-            <EventList />
-          </div>
-          <div className="animate-fade-in-up stagger-2">
-            <TodoList />
-          </div>
-          <div className="animate-fade-in-up stagger-3">
-            <PackageList />
-          </div>
-          <div className="animate-fade-in-up stagger-4">
-            <AnniversaryList />
-          </div>
+        {/* 导航按钮 */}
+        <nav className="flex-1 flex flex-col items-center gap-1.5 px-2 pt-4">
+          {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => handleTabChange(key)}
+              className={`relative flex flex-col items-center gap-1 w-full py-3 rounded-xl text-[11px] transition-all duration-200 group ${
+                activeTab === key
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title={label}
+            >
+              <Icon
+                className={`h-5 w-5 transition-all duration-200 ${
+                  activeTab === key ? "scale-110" : "group-hover:scale-105"
+                }`}
+              />
+              <span className="font-medium leading-none">{label}</span>
+              {/* 左侧激活指示条 */}
+              {activeTab === key && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 bg-primary rounded-r-full" />
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* 底部用户功能区 */}
+        <div className="border-t border-border p-2 flex flex-col items-center gap-2">
+          <UserMenu />
+          <button
+            onClick={() => setHistoryDialogOpen(true)}
+            className="p-1.5 rounded-lg transition-all text-muted-foreground hover:text-primary hover:bg-primary/10"
+            title="聊天记录"
+          >
+            <History className="h-4 w-4" />
+          </button>
         </div>
       </aside>
 
@@ -262,51 +234,18 @@ export default function Home() {
           {/* 移动端顶部用户栏 */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-[10px] font-semibold text-primary">
-                  {account?.nickname?.[0] || "?"}
-                </span>
-              </div>
+              <UserMenu />
               <span className="text-sm font-medium text-foreground">
                 {account?.nickname}
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setHistoryDialogOpen(true)}
-                className="p-1.5 rounded-lg transition-all text-muted-foreground hover:text-primary"
-                title="聊天记录"
-              >
-                <History className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setPhoneDialogOpen(true)}
-                className={`p-1.5 rounded-lg transition-all ${
-                  account?.phone
-                    ? "text-muted-foreground hover:text-primary"
-                    : "text-muted-foreground/50 hover:text-primary"
-                }`}
-                title={account?.phone || "点击填写手机号"}
-              >
-                <Phone className="h-4 w-4" />
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => router.push("/admin")}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary"
-                  title="管理后台"
-                >
-                  <Shield className="h-4 w-4" />
-                </button>
-              )}
-              <button
-                onClick={logout}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive"
-                title="退出登录"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => setHistoryDialogOpen(true)}
+              className="p-1.5 rounded-lg transition-all text-muted-foreground hover:text-primary"
+              title="聊天记录"
+            >
+              <History className="h-4 w-4" />
+            </button>
           </div>
 
           <div className="flex-1 min-h-0 overflow-hidden">
@@ -370,13 +309,6 @@ export default function Home() {
         activeSessionId={sessionId}
       />
 
-      {/* 手机号编辑对话框 */}
-      <PhoneDialog
-        open={phoneDialogOpen}
-        onClose={() => setPhoneDialogOpen(false)}
-        onSaved={refreshAccount}
-        currentPhone={account?.phone ?? null}
-      />
     </div>
   );
 }

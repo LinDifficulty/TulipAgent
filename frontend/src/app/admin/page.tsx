@@ -53,7 +53,7 @@ export default function AdminPage() {
   if (!isAuthenticated || !isAdmin) return null;
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="h-[100dvh] overflow-y-auto bg-background">
       {/* 顶栏 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">

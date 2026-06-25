@@ -308,7 +308,7 @@ async def delete_work_log_content(
         # 如果没有内容了，删除整条日志
         await db.delete(work_log)
         await db.commit()
-        raise HTTPException(status_code=404, detail="日志已删除")
+        return {"status": "ok", "message": "日志已删除"}
 
     work_log.content = json.dumps(contents, ensure_ascii=False)
     work_log.updated_at = datetime.now(timezone.utc)
